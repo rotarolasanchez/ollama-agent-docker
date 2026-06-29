@@ -1,0 +1,25 @@
+# Variables de entorno (contienen contraseñas)
+.env
+
+# Datos reales de clientes (protección de datos personales)
+import/CUBO_VENTAS_7_3.CSV
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# Docker
+*.log
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

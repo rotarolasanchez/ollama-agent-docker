@@ -1,0 +1,81 @@
+services:
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sqlserver
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: ${SA_PASSWORD}
+      MSSQL_PID: Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+      - ./sqlserver/init:/docker-entrypoint-initdb.d
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $$SA_PASSWORD -Q 'SELECT 1' -No || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    networks:
+      - app_network
+
+  ollama-setup:
+    image: ollama/ollama:latest
+    container_name: ollama-setup
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: >
+      sh -c "sleep 8 && ollama pull ${OLLAMA_MODEL:-llama3.1:8b} && echo 'Modelo listo'"
+    networks:
+      - app_network
+    restart: "no"
+
+  api:
+    build:
+      context: ./api
+    container_name: api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DB_HOST: sqlserver
+      DB_PORT: 1433
+      DB_NAME: ${DB_NAME:-FacturasDB}
+      DB_USER: sa
+      DB_PASSWORD: ${SA_PASSWORD}
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
+      SECRET_KEY: ${SECRET_KEY}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    networks:
+      - app_network
+    volumes:
+      - ./api:/app   # hot-reload en desarrollo; quitar en producción
+
+volumes:
+  sqlserver_data:
+  ollama_models:
+
+networks:
+  app_network:
+    driver: bridge
